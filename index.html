@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/src/assets/favicon_io/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/src/assets/favicon_io/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/src/assets/favicon_io/favicon-16x16.png" />
+  <link rel="manifest" href="/src/assets/favicon_io/site.webmanifest" />
+  <link rel="icon" type="image/x-icon" href="/src/assets/favicon_io/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aviation Travel & Flight Information Dashboard</title>
+</head>
+<body class="bg-slate-950 text-slate-50 min-h-screen">
+
+  <!-- Main application mounting point -->
+<div id="app" class="container mx-auto p-6">
+  <header class="mb-8 border-b border-slate-800 pb-4">
+    <h1 class="text-3xl font-extrabold tracking-tight text-blue-500">
+      Aviation Flight Dashboard
+    </h1>
+    <p class="text-sm text-slate-400 mt-1">Real-time aeronautical telemetry and weather information.</p>
+  </header>
+
+  <main id="dashboard-content">
+    <!-- JS modules will inject tables and cards here -->
+    <p class="text-slate-500 animate-pulse">Loading tactical aviation data...</p>
+  </main>
+</div>
+
+<!-- Entry script located in src/js/ -->
+<script type="module" src="/src/js/main.js"></script>
+</body>
+</html>
