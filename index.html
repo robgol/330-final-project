@@ -1,34 +1,78 @@
 <!DOCTYPE html>
-<html lang="en-US">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/330-final-project/assets/apple-touch-icon-Cach9gFE.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="/330-final-project/assets/favicon-32x32-CT83LVzJ.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="/330-final-project/assets/favicon-16x16-C9khj_Wu.png" />
-  <link rel="manifest" href="/330-final-project/assets/site-BwHFeIBa.webmanifest" />
-  <link rel="icon" type="image/x-icon" href="/330-final-project/assets/favicon-Cyxh5cOb.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/330-final-project/assets/apple-touch-icon-Cach9gFE.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/330-final-project/assets/favicon-32x32-CT83LVzJ.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/330-final-project/assets/favicon-16x16-C9khj_Wu.png">
+  <link rel="manifest" href="/330-final-project/assets/site-BwHFeIBa.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Aviation Travel & Flight Information Dashboard</title>
-  <script type="module" crossorigin src="/330-final-project/assets/index-1pbW8oWd.js"></script>
-  <link rel="stylesheet" crossorigin href="/330-final-project/assets/index-DBLSLFnR.css">
+  <title>AeroDash - Aviation Telemetry Dashboard</title>
+  <script type="module" crossorigin src="/330-final-project/assets/index-B1qN7g-D.js"></script>
+  <link rel="stylesheet" crossorigin href="/330-final-project/assets/index-MOcuVllT.css">
 </head>
-<body class="bg-slate-950 text-slate-50 min-h-screen">
+<body class="bg-[#0b192c] text-slate-100 min-h-screen font-sans">
 
-  <!-- Main application mounting point -->
-<div id="app" class="container mx-auto p-6">
-  <header class="mb-8 border-b border-slate-800 pb-4">
-    <h1 class="text-3xl font-extrabold tracking-tight text-blue-500">
-      Aviation Flight Dashboard
-    </h1>
-    <p class="text-sm text-slate-400 mt-1">Real-time aeronautical telemetry and weather information.</p>
-  </header>
+<header class="bg-[#153053] border-b border-slate-800 px-6 py-4 flex justify-between items-center shadow-lg">
+  <div class="flex items-center space-x-3">
+    <img src="/330-final-project/assets/android-chrome-512x512-13JDhYLQ.png" alt="AeroDash Logo" class="w-10 h-10 rounded-lg shadow-sm" />
+    <h1 class="text-xl font-bold tracking-tight text-white">AeroDash</h1>
+  </div>
+  <div class="flex items-center space-x-2">
+    <span class="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+    <span class="text-xs font-mono text-emerald-400 font-semibold uppercase tracking-wider">System Online</span>
+  </div>
+</header>
 
-  <main id="dashboard-content">
-    <!-- JS modules will inject tables and cards here -->
-    <p class="text-slate-500 animate-pulse">Loading tactical aviation data...</p>
-  </main>
-</div>
+<main class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
 
-<!-- Entry script located in src/js/ -->
+  <section class="bg-[#153053] p-5 rounded-xl border border-slate-700/50 shadow-md">
+    <form id="search-form" class="flex flex-col sm:flex-row gap-3">
+      <div class="flex-1">
+        <input
+                type="text"
+                placeholder="Enter Airport IATA/ICAO Code (e.g., RAI, LIS, GVNP)..."
+                class="w-full px-4 py-2.5 bg-[#0b192c] border border-slate-700 rounded-lg text-white font-mono placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors uppercase"
+                required
+        />
+      </div>
+      <button
+              type="submit"
+              class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors shadow-md"
+      >
+        Query Node
+      </button>
+    </form>
+  </section>
+
+  <section id="weather-container" class="transition-all"></section>
+
+  <section id="filter-controls" class="hidden bg-[#0f243e] p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="flex rounded-lg bg-[#0b192c] p-1 border border-slate-800">
+      <button id="btn-departures" class="px-4 py-1.5 text-sm font-medium rounded-md transition-all bg-blue-600 text-white">
+        🛫 Departures
+      </button>
+      <button id="btn-arrivals" class="px-4 py-1.5 text-sm font-medium rounded-md transition-all text-slate-400 hover:text-white">
+        🛬 Arrivals
+      </button>
+    </div>
+
+    <div class="flex items-center space-x-3">
+      <label class="relative inline-flex items-center cursor-pointer select-none">
+        <input type="checkbox" id="chk-delays-45" class="sr-only peer" />
+        <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500/80 peer-checked:after:bg-white"></div>
+        <span class="ms-3 text-sm font-medium text-slate-300">Significant Delays (> 45m)</span>
+      </label>
+    </div>
+  </section>
+
+  <section id="dashboard-content">
+    <div class="text-center py-12 bg-[#153053]/30 border border-dashed border-slate-700/60 rounded-xl">
+      <p class="text-slate-400 font-medium">Awaiting operational telemetry lookup for a specific aerodrome...</p>
+    </div>
+  </section>
+
+</main>
+
 </body>
 </html>
