@@ -3,46 +3,48 @@ import ExternalAviationServices from './ExternalAviationServices.mjs';
 import AirportDashboard from './AirportDashboard.mjs';
 import WeatherProcessor from './WeatherProcessor.mjs';
 
-// 1. Inicializar o serviço de dados e os componentes de UI
-const apiService = new ExternalAviationServices();
-const dashboard = new AirportDashboard('dashboard-content', 'search-form');
-const weatherProcessor = new WeatherProcessor('weather-container');
-
-// Estado local da aplicação para gerir os filtros em memória
+// Declaração das variáveis de controlo no âmbito global do módulo
+let apiService;
+let dashboard;
+let weatherProcessor;
 let currentFlights = [];
-let currentFilterType = 'departure'; // 'departure' ou 'arrival'
+let currentFilterType = 'departure';
 
 /**
- * Coordenador principal de busca e renderização
- * @param {string} airportIata - Código do aeroporto introduzido pelo utilizador
+ * Main coordinator for lookup validation and rendering
  */
 async function handleAirportSearch(airportIata) {
-    const mainDisplay = document.getElementById('dashboard-content');
+    const cleanInput = airportIata.trim().toUpperCase();
+    const aviationCodeRegex = /^[A-Z]{3,4}$/;
+
+    if (!aviationCodeRegex.test(cleanInput)) {
+        document.getElementById('weather-container').innerHTML = '';
+        document.getElementById('filter-controls')?.classList.add('hidden');
+        dashboard.renderError('Invalid airport code format. Please enter a valid 3-letter IATA (e.g., RAI) or 4-letter ICAO (e.g., GVNP) code containing only letters.');
+        return;
+    }
 
     try {
-        // 2. Procurar e renderizar a meteorologia (AVWX)
-        const weatherData = await apiService.getAirportWeather(airportIata);
+        // Procurar e renderizar a meteorologia (AVWX)
+        const weatherData = await apiService.getAirportWeather(cleanInput);
         weatherProcessor.render(weatherData);
 
-        // 3. Procurar os dados de voo com base no tipo ativo (Partidas/Chegadas)
-        currentFlights = await apiService.getAirportFlights(airportIata, currentFilterType);
+        // Procurar os dados de voo com base no tipo ativo (Partidas/Chegadas)
+        currentFlights = await apiService.getAirportFlights(cleanInput, currentFilterType);
 
-        // 4. Renderizar a lista de cartões usando o módulo UI
+        // Renderizar a lista de cartões usando o módulo UI
         dashboard.renderFlights(currentFlights);
 
-        // Revelar a barra de controlos de filtros (caso estivesse escondida)
+        // Revelar a barra de controlos de filtros
         document.getElementById('filter-controls')?.classList.remove('hidden');
 
     } catch (error) {
         console.error('Erro ao processar dados aeronáuticos:', error);
 
-        // Tratamento visual de erros conforme os padrões exigidos
-        mainDisplay.innerHTML = `
-      <div class="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg col-span-full">
-        <h2 class="font-bold">Operational Connection Failure</h2>
-        <p class="text-sm mt-1">Unable to load telemetry for network node ${airportIata}. Please verify the code and try again.</p>
-      </div>
-    `;
+        document.getElementById('weather-container').innerHTML = '';
+        document.getElementById('filter-controls')?.classList.add('hidden');
+
+        dashboard.renderError(`Operational Connection Failure: Unable to load telemetry for network node ${cleanInput}. Please verify the code and try again.`);
     }
 }
 
@@ -54,25 +56,20 @@ function setupFilterListeners() {
     const btnArrivals = document.getElementById('btn-arrivals');
     const chkDelays = document.getElementById('chk-delays-45');
 
-    // Alternar para Fluxo de Partidas
     btnDepartures?.addEventListener('click', () => {
         currentFilterType = 'departure';
         btnDepartures.classList.add('bg-blue-600', 'text-white');
         btnArrivals?.classList.remove('bg-blue-600', 'text-white');
-
         triggerRefetch();
     });
 
-    // Alternar para Fluxo de Chegadas
     btnArrivals?.addEventListener('click', () => {
         currentFilterType = 'arrival';
         btnArrivals.classList.add('bg-blue-600', 'text-white');
         btnDepartures?.classList.remove('bg-blue-600', 'text-white');
-
         triggerRefetch();
     });
 
-    // Filtro Avançado em Memória: Atrasos > 45 minutos (Desafio de Manipulação de Arrays JSON)
     chkDelays?.addEventListener('change', (e) => {
         if (e.target.checked) {
             const delayedFlights = currentFlights.filter(f => {
@@ -81,15 +78,11 @@ function setupFilterListeners() {
             });
             dashboard.renderFlights(delayedFlights);
         } else {
-            // Restaura o estado original guardado localmente sem sobrecarregar a API
             dashboard.renderFlights(currentFlights);
         }
     });
 }
 
-/**
- * Auxiliar para relançar a busca quando o utilizador muda o sentido do tráfego (Partidas/Chegadas)
- */
 function triggerRefetch() {
     const input = document.querySelector('#search-form input[type="text"]');
     if (input && input.value.trim() !== '') {
@@ -98,11 +91,16 @@ function triggerRefetch() {
     }
 }
 
-// Inicializar a aplicação assim que a árvore DOM estiver totalmente segura
+// Inicializar de forma segura garantindo que o DOM está mapeado
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Aviation Dashboard Lifecycle Hooked.");
 
-    // Passa a função coordenadora para dentro da classe gerir o submit
+    // Instanciar os serviços APENAS quando o DOM estiver pronto
+    apiService = new ExternalAviationServices();
+    dashboard = new AirportDashboard('dashboard-content', 'search-form');
+    weatherProcessor = new WeatherProcessor('weather-container');
+
+    // Inicializar o escutador do formulário e filtros
     dashboard.init(handleAirportSearch);
     setupFilterListeners();
 });

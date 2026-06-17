@@ -9,9 +9,9 @@ export default class ExternalAviationServices {
         this.flightApiUrl = 'https://api.aviationstack.com/v1/flights';
         this.weatherApiUrl = 'https://avwx.rest/api/metar';
 
-        // Developer Credentials (To be populated with live keys during production deployment)
-        this.flightApiKey = '';
-        this.weatherApiKey = '';
+        // Developer Credentials - Live Production Keys Integrated
+        this.flightApiKey = 'bb79973d3e878629926853ddce3ac4f1';
+        this.weatherApiKey = 'AQr5Qk5OKrSKX_OZV7r-EP36M4azMnLYKinWdHZgiqE';
     }
 
     /**
@@ -20,28 +20,29 @@ export default class ExternalAviationServices {
      * @returns {Object} Deeply nested JSON weather report structure
      */
     async getAirportWeather(airport) {
-        // AVWX demands a 4-letter ICAO code. If user enters 3-letter IATA (e.g., RAI), we gracefully map it.
         let icao = airport.trim().toUpperCase();
         if (icao.length === 3) {
             if (icao === 'RAI') icao = 'GVNP';
             else if (icao === 'LIS') icao = 'LPPT';
             else if (icao === 'SID') icao = 'GVAC';
-            else icao = `G${icao}`; // Standard geographical prefix approximation
-        }
-
-        // If API Keys are missing, immediately pipe the rich offline simulation mode
-        if (!this.weatherApiKey) {
-            return this._getSandboxWeather(icao);
+            else icao = `G${icao}`;
         }
 
         try {
+            // A AVWX exige explicitamente o prefixo "Token " antes da chave de API
             const response = await fetch(`${this.weatherApiUrl}/${icao}`, {
-                headers: { 'Authorization': `BEARER ${this.weatherApiKey}` }
+                headers: {
+                    'Authorization': `Token ${this.weatherApiKey}`
+                }
             });
+
             if (!response.ok) throw new Error(`AVWX Telemetry HTTP Error: ${response.status}`);
-            return await response.json();
+
+            const data = await response.json();
+            console.log("Live Weather Data Received:", data);
+            return data;
         } catch (error) {
-            console.warn(`AVWX API offline or throttled. Engaging local meteorological sandbox for ${icao}.`);
+            console.warn(`AVWX API failure. Engaging local meteorological sandbox for ${icao}.`, error);
             return this._getSandboxWeather(icao);
         }
     }
@@ -55,18 +56,25 @@ export default class ExternalAviationServices {
     async getAirportFlights(airportIata, type = 'departure') {
         const iata = airportIata.trim().toUpperCase().substring(0, 3);
 
-        if (!this.flightApiKey) {
-            return this._getSandboxFlights(iata, type);
-        }
-
         try {
-            const url = `${this.flightApiUrl}?access_key=${this.flightApiKey}&${type}_iata=${iata}&limit=20`;
+            // Parâmetro correto para a conta gratuita da Aviationstack filtrar por fluxo de tráfego
+            const paramType = type === 'departure' ? 'dep_iata' : 'arr_iata';
+            const url = `${this.flightApiUrl}?access_key=${this.flightApiKey}&${paramType}=${iata}&limit=20`;
+
             const response = await fetch(url);
             if (!response.ok) throw new Error(`Aviationstack HTTP Error: ${response.status}`);
+
             const payload = await response.json();
-            return payload.data || [];
+            console.log("Live Flights Data Received:", payload);
+
+            // Se a API retornar um array vazio devido a restrições de rotas gratuitas, ativa o sandbox
+            if (!payload.data || payload.data.length === 0) {
+                return this._getSandboxFlights(iata, type);
+            }
+
+            return payload.data;
         } catch (error) {
-            console.warn(`Aviationstack API throttled. Engaging local flight operations sandbox for ${iata}.`);
+            console.warn(`Aviationstack API throttled. Engaging local flight operations sandbox for ${iata}.`, error);
             return this._getSandboxFlights(iata, type);
         }
     }
@@ -77,30 +85,28 @@ export default class ExternalAviationServices {
     _getSandboxWeather(icao) {
         return {
             station: icao,
-            raw: `${icao} 142200Z 21012KT 9999 FEW018 BKN250 24/18 Q1014 NOSIG`,
+            raw: `${icao} 171930Z 21014KT 9999 FEW022 26/20 Q1013 NOSIG`,
             flight_rules: 'VFR',
-            temperature: { value: 24 },
-            dewpoint: { value: 18 },
-            wind_speed: { value: 12 },
+            temperature: { value: 26 },
+            dewpoint: { value: 20 },
+            wind_speed: { value: 14 },
             wind_direction: { value: 210 },
             visibility: { value: 10 },
-            altimeter: { value: 1014 },
+            altimeter: { value: 1013 },
             clouds: [
-                { repr: 'FEW', altitude: 18 },
-                { repr: 'BKN', altitude: 250 }
+                { repr: 'FEW', altitude: 22 }
             ]
         };
     }
 
     /**
      * Internal Sandbox Proving Grounds - Complex Flight Objects Mapping
-     * Hardcodes over 6 attributes per element to securely validate the UI filters.
      */
     _getSandboxFlights(iata, type) {
         const isDeparture = type === 'departure';
         return [
             {
-                flight_date: "2026-06-14",
+                flight_date: "2026-06-17",
                 flight_status: "active",
                 flight: { number: "VR601" },
                 airline: { name: "Cabo Verde Airlines" },
@@ -108,7 +114,7 @@ export default class ExternalAviationServices {
                 arrival: { airport: "Lisbon Humberto Delgado", iata: "LIS", icao: "LPPT", terminal: "T1", gate: "A12", delay: 0 }
             },
             {
-                flight_date: "2026-06-14",
+                flight_date: "2026-06-17",
                 flight_status: "delayed",
                 flight: { number: "TP1492" },
                 airline: { name: "TAP Air Portugal" },
@@ -116,7 +122,7 @@ export default class ExternalAviationServices {
                 arrival: { airport: "Lisbon Humberto Delgado", iata: "LIS", icao: "LPPT", terminal: "T1", gate: "B04", delay: 45 }
             },
             {
-                flight_date: "2026-06-14",
+                flight_date: "2026-06-17",
                 flight_status: "scheduled",
                 flight: { number: "AT931" },
                 airline: { name: "Royal Air Maroc" },
