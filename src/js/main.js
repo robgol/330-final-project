@@ -2,55 +2,122 @@ import '../css/main.css';
 import ExternalAviationServices from './ExternalAviationServices.mjs';
 import AirportDashboard from './AirportDashboard.mjs';
 import WeatherProcessor from './WeatherProcessor.mjs';
+import FavoritesManager from './FavoritesManager.mjs';
 
-// Declaração das variáveis de controlo no âmbito global do módulo
-let apiService;
-let dashboard;
-let weatherProcessor;
+const apiService = new ExternalAviationServices();
+const dashboard = new AirportDashboard('dashboard-content', 'search-form');
+const weatherProcessor = new WeatherProcessor('weather-container');
+const favoritesManager = new FavoritesManager();
+
 let currentFlights = [];
 let currentFilterType = 'departure';
+let activeSearchCode = '';
 
 /**
- * Main coordinator for lookup validation and rendering
+ * Intelligent Router: Detects whether input is an Airport Node (IATA/ICAO) or a Flight Number
  */
-async function handleAirportSearch(airportIata) {
-    const cleanInput = airportIata.trim().toUpperCase();
-    const aviationCodeRegex = /^[A-Z]{3,4}$/;
+async function handleAirportSearch(inputString) {
+    // Sanitização de Input: Remove espaços extra, caracteres especiais e converte para UPPERCASE
+    const cleanInput = inputString.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-    if (!aviationCodeRegex.test(cleanInput)) {
-        document.getElementById('weather-container').innerHTML = '';
-        document.getElementById('filter-controls')?.classList.add('hidden');
-        dashboard.renderError('Invalid airport code format. Please enter a valid 3-letter IATA (e.g., RAI) or 4-letter ICAO (e.g., GVNP) code containing only letters.');
+    if (!cleanInput) {
+        dashboard.renderError("Invalid Input: Please enter a valid alphanumeric Airport Code or Flight Number.");
         return;
     }
 
-    try {
-        // Procurar e renderizar a meteorologia (AVWX)
-        const weatherData = await apiService.getAirportWeather(cleanInput);
-        weatherProcessor.render(weatherData);
+    activeSearchCode = cleanInput;
+    const isFlightNumber = /\d/.test(cleanInput);
 
-        // Procurar os dados de voo com base no tipo ativo (Partidas/Chegadas)
-        currentFlights = await apiService.getAirportFlights(cleanInput, currentFilterType);
+    if (isFlightNumber) {
+        try {
+            // Regra tática: Ocultar controlos de filtro e limpar contentor de meteorologia no tracking individual
+            document.getElementById('filter-controls')?.classList.add('hidden');
+            document.getElementById('weather-container').innerHTML = '';
 
-        // Renderizar a lista de cartões usando o módulo UI
-        dashboard.renderFlights(currentFlights);
+            const individualFlight = await apiService.getFlightByNumber(cleanInput);
+            dashboard.renderFlights(individualFlight, true);
 
-        // Revelar a barra de controlos de filtros
-        document.getElementById('filter-controls')?.classList.remove('hidden');
+        } catch (error) {
+            console.error('Flight Track Error:', error);
+            dashboard.renderError(`Tracking Link Error: Unable to locate active flight vectors for identifier ${cleanInput}.`);
+        }
+    } else {
+        try {
+            const weatherData = await apiService.getAirportWeather(cleanInput);
+            weatherProcessor.render(weatherData.metar, weatherData.taf);
 
-    } catch (error) {
-        console.error('Erro ao processar dados aeronáuticos:', error);
+            const flightsData = await apiService.getAirportFlights(cleanInput, currentFilterType);
 
-        document.getElementById('weather-container').innerHTML = '';
-        document.getElementById('filter-controls')?.classList.add('hidden');
+            currentFlights = flightsData.map(f => ({
+                ...f,
+                arrival_board_active: currentFilterType === 'arrival'
+            }));
 
-        dashboard.renderError(`Operational Connection Failure: Unable to load telemetry for network node ${cleanInput}. Please verify the code and try again.`);
+            dashboard.renderFlights(currentFlights, false);
+            renderFavoriteToggleBtn();
+
+            // Mostrar os filtros apenas se for um painel de aeroporto válido
+            document.getElementById('filter-controls')?.classList.remove('hidden');
+
+        } catch (error) {
+            console.error('Airport Board Error:', error);
+            document.getElementById('filter-controls')?.classList.add('hidden');
+            dashboard.renderError(`Operational Connection Failure: Unable to load telemetry for network node ${cleanInput}.`);
+        }
     }
 }
 
-/**
- * Configuração dos escutadores de eventos para os Filtros Dinâmicos
- */
+function renderFavoritesBar() {
+    const container = document.getElementById('favorites-list');
+    if (!container) return;
+
+    const list = favoritesManager.getFavorites();
+    if (list.length === 0) {
+        container.innerHTML = `<span class="text-slate-600 italic font-mono">No nodes pinned. Click the star on a searched airport.</span>`;
+        return;
+    }
+
+    container.innerHTML = list.map(code => `
+        <button data-code="${code}" class="px-2.5 py-1 bg-[#153053] hover:bg-blue-600 text-slate-200 hover:text-white rounded font-mono font-bold transition-all border border-slate-700/50 shadow-sm flex items-center space-x-1">
+           <span>📌</span> <span>${code}</span>
+        </button>
+    `).join('');
+
+    container.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const code = btn.getAttribute('data-code');
+            const input = document.querySelector('#search-form input[type="text"]');
+            if (input) input.value = code;
+            dashboard.showLoading();
+            handleAirportSearch(code);
+        });
+    });
+}
+
+function renderFavoriteToggleBtn() {
+    const titleHeader = document.querySelector('#weather-container h3');
+    if (!titleHeader) return;
+
+    const isFav = favoritesManager.isFavorite(activeSearchCode);
+    let favBtn = document.getElementById('btn-favorite-toggle');
+    if (!favBtn) {
+        favBtn = document.createElement('button');
+        favBtn.id = 'btn-favorite-toggle';
+        titleHeader.parentElement.appendChild(favBtn);
+    }
+
+    favBtn.className = `ml-3 px-3 py-1 text-xs rounded-md border font-medium font-mono transition-all ${isFav ? 'bg-amber-500/15 border-amber-500/40 text-amber-400' : 'bg-slate-800/40 border-slate-700 text-slate-400 hover:text-slate-200'
+        }`;
+    favBtn.innerHTML = isFav ? '★ Pinned' : '☆ Pin Node';
+
+    favBtn.onclick = (e) => {
+        e.preventDefault();
+        favoritesManager.toggleFavorite(activeSearchCode);
+        renderFavoriteToggleBtn();
+        renderFavoritesBar();
+    };
+}
+
 function setupFilterListeners() {
     const btnDepartures = document.getElementById('btn-departures');
     const btnArrivals = document.getElementById('btn-arrivals');
@@ -73,34 +140,40 @@ function setupFilterListeners() {
     chkDelays?.addEventListener('change', (e) => {
         if (e.target.checked) {
             const delayedFlights = currentFlights.filter(f => {
-                const delay = f.departure?.delay || f.arrival?.delay || 0;
-                return delay > 45;
+                const currentFlow = currentFilterType === 'departure' ? f.departure : f.arrival;
+                return (currentFlow?.delay || 0) > 45;
             });
             dashboard.renderFlights(delayedFlights);
         } else {
-            dashboard.renderFlights(currentFlights);
+            dashboard.renderFlights(currentFlights, false);
         }
     });
 }
 
 function triggerRefetch() {
-    const input = document.querySelector('#search-form input[type="text"]');
-    if (input && input.value.trim() !== '') {
+    const form = document.getElementById('search-form');
+    const input = form?.querySelector('input[type="text"]');
+
+    // Certificar que não fazemos refetch automático se o input atual for um número de voo
+    if (input && form.checkValidity() && !/\d/.test(input.value)) {
         dashboard.showLoading();
         handleAirportSearch(input.value.trim().toUpperCase());
     }
 }
 
-// Inicializar de forma segura garantindo que o DOM está mapeado
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Aviation Dashboard Lifecycle Hooked.");
+    const form = document.getElementById('search-form');
+    if (form) {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = form.querySelector('input[type="text"]');
+            if (input && input.value.trim() !== '') {
+                dashboard.showLoading();
+                handleAirportSearch(input.value.trim().toUpperCase());
+            }
+        });
+    }
 
-    // Instanciar os serviços APENAS quando o DOM estiver pronto
-    apiService = new ExternalAviationServices();
-    dashboard = new AirportDashboard('dashboard-content', 'search-form');
-    weatherProcessor = new WeatherProcessor('weather-container');
-
-    // Inicializar o escutador do formulário e filtros
-    dashboard.init(handleAirportSearch);
     setupFilterListeners();
+    renderFavoritesBar();
 });
